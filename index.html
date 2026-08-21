@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Macros — copiar com um clique</title>
+<style>
+  :root{
+    --bg:#151a21;
+    --panel:#1e252e;
+    --panel-hover:#242c37;
+    --gold:#d9a441;
+    --text:#edeef0;
+    --text-dim:#9aa2ad;
+    --border:#2c3543;
+    --default-color:#5f6774;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    min-height:100vh;
+    padding:40px 24px 80px;
+  }
+  .wrap{max-width:840px;margin:0 auto;}
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:16px;
+    margin-bottom:20px;
+    flex-wrap:wrap;
+  }
+  h1{
+    font-family:"Courier New",Courier,monospace;
+    font-size:30px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+    margin:0 0 6px;
+  }
+  .sub{color:var(--text-dim);font-size:14px;margin:0;}
+  button{font-family:inherit;cursor:pointer;}
+  .btn-add{
+    background:var(--gold);
+    color:#2a1e05;
+    border:none;
+    border-radius:8px;
+    padding:10px 18px;
+    font-size:14px;
+    font-weight:700;
+    white-space:nowrap;
+    transition:transform .12s ease, background .15s ease;
+  }
+  .btn-add:hover{background:#e6b453;}
+  .btn-add:active{transform:scale(.97);}
+
+  .toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .toolbar-hint{font-size:12px;color:var(--text-dim);}
+  .toolbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .btn-io{
+    background:var(--panel);
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    border-radius:8px;
+    padding:8px 14px;
+    font-size:13px;
+    font-weight:600;
+    white-space:nowrap;
+    transition:color .15s ease, border-color .15s ease;
+  }
+  .btn-io:hover{color:var(--text);border-color:var(--text-dim);}
+  #io-panel{
+    display:none;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px;
+    margin-bottom:20px;
+  }
+  #io-panel.open{display:block;}
+  #io-panel label{
+    display:block;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--text-dim);
+    margin-bottom:6px;
+  }
+  #io-textarea{
+    width:100%;
+    min-height:140px;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:8px;
+    color:var(--text);
+    font-family:"Courier New",Courier,monospace;
+    font-size:12px;
+    line-height:1.5;
+    padding:10px 12px;
+    margin-bottom:10px;
+    resize:vertical;
+  }
+  #io-msg{font-size:13px;margin:0 0 10px;display:none;}
+  #io-msg.error{color:#e0776f;}
+  #io-msg.success{color:#4f9d5c;}
+  .view-toggle{
+    display:inline-flex;
+    border:1px solid var(--border);
+    border-radius:8px;
+    overflow:hidden;
+    flex-shrink:0;
+  }
+  .view-toggle button{
+    background:var(--panel);
+    border:none;
+    color:var(--text-dim);
+    font-size:13px;
+    font-weight:600;
+    padding:8px 14px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    white-space:nowrap;
+  }
+  .view-toggle button:not(:last-child){border-right:1px solid var(--border);}
+  .view-toggle button.active{background:var(--panel-hover);color:var(--text);}
+  .view-toggle button:hover{color:var(--text);}
+
+  #form-panel{
+    display:none;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:20px;
+    margin-bottom:28px;
+  }
+  #form-panel.open{display:block;}
+  #form-panel label{
+    display:block;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--text-dim);
+    margin-bottom:6px;
+  }
+  #form-panel input, #form-panel textarea{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:8px;
+    color:var(--text);
+    font-size:14px;
+    font-family:inherit;
+    padding:10px 12px;
+    margin-bottom:14px;
+    resize:vertical;
+  }
+  #form-panel textarea{min-height:100px;line-height:1.5;}
+  .format-toolbar{
+    position:relative;
+    display:flex;
+    gap:6px;
+    margin-bottom:8px;
+    flex-wrap:wrap;
+  }
+  .format-btn{
+    background:var(--bg);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:6px;
+    padding:6px 11px;
+    font-size:13px;
+    line-height:1;
+  }
+  .format-btn:hover{border-color:var(--text-dim);}
+  .format-btn.emoji-btn{font-size:15px;padding:5px 10px;}
+  #emoji-popover{
+    display:none;
+    position:absolute;
+    top:100%;
+    left:0;
+    margin-top:6px;
+    background:var(--panel-hover);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:10px;
+    width:260px;
+    max-height:200px;
+    overflow-y:auto;
+    z-index:20;
+    grid-template-columns:repeat(8,1fr);
+    gap:2px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.35);
+  }
+  #emoji-popover.open{display:grid;}
+  .emoji-option{
+    background:transparent;
+    border:none;
+    font-size:18px;
+    padding:4px;
+    border-radius:6px;
+    line-height:1;
+  }
+  .emoji-option:hover{background:var(--panel);}
+  .color-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .color-swatch{
+    width:28px;
+    height:28px;
+    border-radius:50%;
+    border:2px solid transparent;
+    cursor:pointer;
+    padding:0;
+    flex-shrink:0;
+    transition:transform .1s ease, border-color .1s ease;
+  }
+  .color-swatch:hover{transform:scale(1.1);}
+  .color-swatch.selected{border-color:#fff;transform:scale(1.12);}
+  .form-actions{display:flex;gap:10px;justify-content:flex-end;}
+  .btn-secondary{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    border-radius:8px;
+    padding:9px 16px;
+    font-size:14px;
+  }
+  .btn-secondary:hover{border-color:var(--text-dim);color:var(--text);}
+  .btn-primary{
+    background:var(--gold);
+    border:none;
+    color:#2a1e05;
+    border-radius:8px;
+    padding:9px 16px;
+    font-size:14px;
+    font-weight:700;
+  }
+  .btn-primary:hover{background:#e6b453;}
+  .error-msg{color:#e0776f;font-size:13px;margin:-8px 0 12px;display:none;}
+
+  #grid.view-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+    gap:16px;
+    align-items:start;
+  }
+  #grid.view-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px 16px 14px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    min-width:0;
+    transition:border-color .15s ease, opacity .15s ease;
+  }
+  .card:hover{border-color:#3a4453;}
+  .card.dragging{opacity:.35;}
+  .drag-over-top{border-top:2px solid var(--gold);}
+  .drag-over-bottom{border-bottom:2px solid var(--gold);}
+
+  .card-top-row{display:flex;align-items:flex-start;gap:8px;min-width:0;}
+  .drag-handle{
+    cursor:grab;
+    color:var(--text-dim);
+    font-size:16px;
+    line-height:1;
+    padding:2px 2px;
+    user-select:none;
+    flex-shrink:0;
+  }
+  .drag-handle:active{cursor:grabbing;}
+  .color-dot{
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    flex-shrink:0;
+    margin-top:5px;
+  }
+  .card-title{
+    font-weight:700;
+    font-size:15px;
+    margin:0;
+    flex:1;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+  .icon-actions{display:flex;gap:2px;flex-shrink:0;}
+  .icon-btn{
+    background:transparent;
+    border:none;
+    color:var(--text-dim);
+    font-size:12px;
+    padding:3px 5px;
+    border-radius:4px;
+    line-height:1;
+    white-space:nowrap;
+  }
+  .icon-btn:hover{color:var(--text);background:var(--panel-hover);}
+  .card-preview{
+    font-family:inherit;
+    font-weight:700;
+    font-size:15px;
+    color:var(--text);
+    line-height:1.5;
+    margin:0;
+    white-space:pre-wrap;
+    overflow-wrap:anywhere;
+  }
+  .stamp-btn{
+    margin-top:auto;
+    border:2px solid var(--default-color);
+    background:transparent;
+    color:var(--text);
+    border-radius:8px;
+    padding:9px 0;
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    flex-shrink:0;
+    transition:transform .1s ease, background .15s ease, color .15s ease;
+  }
+  .stamp-btn:active{transform:scale(.96);}
+
+  /* list mode overrides */
+  #grid.view-list .card{
+    flex-direction:row;
+    align-items:center;
+    padding:9px 14px;
+    gap:12px;
+  }
+  #grid.view-list .card-top-row{
+    flex:0 0 auto;
+    align-items:center;
+    max-width:44%;
+  }
+  #grid.view-list .card-title{
+    flex:0 1 auto;
+    min-width:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  #grid.view-list .icon-actions{flex-shrink:0;}
+  #grid.view-list .card-preview{
+    display:block;
+    flex:1;
+    min-width:0;
+    margin:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  #grid.view-list .stamp-btn{
+    margin-top:0;
+    padding:6px 16px;
+    width:auto;
+    flex-shrink:0;
+  }
+  #grid.view-list .color-dot{margin-top:0;}
+
+  .empty{
+    text-align:center;
+    color:var(--text-dim);
+    padding:60px 20px;
+    border:1px dashed var(--border);
+    border-radius:12px;
+    font-size:14px;
+  }
+  .loading{color:var(--text-dim);font-size:14px;padding:20px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Macros</h1>
+      <p class="sub">Clique em copiar e cole onde precisar.</p>
+    </div>
+    <button class="btn-add" id="toggle-form">+ Nova macro</button>
+  </header>
+
+  <div id="form-panel">
+    <label for="f-title">Título</label>
+    <input id="f-title" type="text" placeholder="Ex: Boas-vindas ao cliente" maxlength="80">
+    <p class="error-msg" id="err-title">Digite um título.</p>
+
+    <label for="f-text">Texto</label>
+    <div class="format-toolbar" id="format-toolbar">
+      <button type="button" class="format-btn" id="fmt-bold" title="Negrito"><b>N</b></button>
+      <button type="button" class="format-btn" id="fmt-italic" title="Itálico"><i>I</i></button>
+      <button type="button" class="format-btn" id="fmt-strike" title="Riscado"><s>R</s></button>
+      <button type="button" class="format-btn emoji-btn" id="emoji-toggle" title="Inserir emoji">😊 Emoji</button>
+      <div id="emoji-popover"></div>
+    </div>
+    <textarea id="f-text" placeholder="Digite o texto que será copiado ao clicar."></textarea>
+    <p class="error-msg" id="err-text">Digite o texto da macro.</p>
+
+    <label>Cor</label>
+    <div class="color-row" id="color-row"></div>
+
+    <div class="form-actions">
+      <button class="btn-secondary" id="cancel-form">Cancelar</button>
+      <button class="btn-primary" id="save-form">Salvar</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <span class="toolbar-hint">Arraste pelo ⠿ para reordenar</span>
+    <div class="toolbar-right">
+      <button class="btn-io" id="btn-export">Exportar</button>
+      <button class="btn-io" id="btn-import">Importar</button>
+      <div class="view-toggle">
+        <button id="btn-view-grid" class="active">▦ Grade</button>
+        <button id="btn-view-list">☰ Lista</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="io-panel">
+    <label for="io-textarea">JSON das macros</label>
+    <textarea id="io-textarea" spellcheck="false"></textarea>
+    <p id="io-msg"></p>
+    <div class="form-actions">
+      <button class="btn-secondary" id="io-cancel">Fechar</button>
+      <button class="btn-primary" id="io-apply">Aplicar como minhas macros</button>
+    </div>
+  </div>
+
+  <div id="loading" class="loading">Carregando suas macros…</div>
+  <div id="grid" class="view-grid" style="display:none;"></div>
+  <div id="empty" class="empty" style="display:none;">Nenhuma macro ainda. Clique em "+ Nova macro" para criar a primeira.</div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'macros-list';
+  const VIEW_KEY = 'macros-view-pref';
+  let macros = [];
+  let editingId = null;
+  let currentView = 'grid';
+  let selectedColor = null;
+  let dragSrcId = null;
+
+  const COLORS = [
+    { name: 'Sem cor', value: null },
+    { name: 'Vermelho', value: '#c1443a' },
+    { name: 'Laranja', value: '#cf7a3a' },
+    { name: 'Dourado', value: '#d9a441' },
+    { name: 'Verde', value: '#4f9d5c' },
+    { name: 'Turquesa', value: '#2f9e8a' },
+    { name: 'Azul', value: '#3d84c9' },
+    { name: 'Roxo', value: '#8072d6' },
+    { name: 'Rosa', value: '#c9538a' }
+  ];
+
+  const DEFAULT_MACROS = [
+    { id: 'm2', title: 'Posi', text: 'Positivo... 👍🏼', color: '#4f9d5c' },
+    { id: 'm1', title: 'Posi', text: 'Positivo... 👍🏼👍🏼', color: '#4f9d5c' },
+    { id: 'mmsu0slubjw94e', title: 'Posi', text: 'Positivo!\nMarcado... 👍🏼', color: '#4f9d5c' },
+    { id: 'mmsu0mhyoommsw', title: 'Posi', text: 'Positivo... 👍🏼\nObrigado por avisar 👍🏼', color: '#4f9d5c' },
+    { id: 'mmsu0pvwssi0pd', title: 'Noite', text: 'Boa noite!\nPositivo... 👍🏼👍🏼', color: null },
+    { id: 'm3', title: 'Noite', text: 'Boa noite!\nPositivo... Bom descanso. 👍🏼👍🏼', color: null },
+    { id: 'mmsu0r2h83ih4t', title: 'Noite', text: 'Boa noite!\nPositivo... Boa viagem. 👍🏼👍🏼', color: null },
+    { id: 'mmsu0ruc25c9lo', title: 'Noite', text: 'Boa noite!\nPositivo... Bom retorno. 👍🏼👍🏼', color: null },
+    { id: 'mmsu0t01lfkub5', title: 'Noite', text: 'Boa noite!\nPositivo... Marcado 👍🏼', color: null },
+    { id: 'mmsu0q8kkz87fg', title: 'Dia', text: 'Bom dia!\nPositivo... 👍🏼', color: '#d9a441' },
+    { id: 'mmsu08diupn56w', title: 'Dia', text: 'Bom dia!\nPositivo... Bom descanso. 👍🏼👍🏼', color: '#d9a441' },
+    { id: 'mmsu0ri8qn6fdk', title: 'Dia', text: 'Bom dia!\nPositivo... Boa viagem. 👍🏼👍🏼', color: '#d9a441' },
+    { id: 'mmsu0s9vndrmqm', title: 'Dia', text: 'Bom dia!\nPositivo... Bom retorno. 👍🏼👍🏼', color: '#d9a441' }
+  ];
+
+  const gridEl = document.getElementById('grid');
+  const loadingEl = document.getElementById('loading');
+  const emptyEl = document.getElementById('empty');
+  const formPanel = document.getElementById('form-panel');
+  const toggleFormBtn = document.getElementById('toggle-form');
+  const cancelFormBtn = document.getElementById('cancel-form');
+  const saveFormBtn = document.getElementById('save-form');
+  const fTitle = document.getElementById('f-title');
+  const fText = document.getElementById('f-text');
+  const fmtBold = document.getElementById('fmt-bold');
+  const fmtItalic = document.getElementById('fmt-italic');
+  const fmtStrike = document.getElementById('fmt-strike');
+  const emojiToggle = document.getElementById('emoji-toggle');
+  const emojiPopover = document.getElementById('emoji-popover');
+  const errTitle = document.getElementById('err-title');
+  const errText = document.getElementById('err-text');
+  const colorRow = document.getElementById('color-row');
+  const btnViewGrid = document.getElementById('btn-view-grid');
+  const btnViewList = document.getElementById('btn-view-list');
+  const btnExport = document.getElementById('btn-export');
+  const btnImport = document.getElementById('btn-import');
+  const ioPanel = document.getElementById('io-panel');
+  const ioTextarea = document.getElementById('io-textarea');
+  const ioMsg = document.getElementById('io-msg');
+  const ioCancel = document.getElementById('io-cancel');
+  const ioApply = document.getElementById('io-apply');
+
+  function uid(){
+    return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  }
+
+  const EMOJIS = [
+    '😀','😄','😁','😊','🙂','😉','😍','😘','😎','🤩',
+    '🤗','🙏','👍','👍🏼','👎','👌','✌️','🤝','👏','💪',
+    '❤️','💛','💚','💙','✨','🎉','🔥','⭐','✅','☑️',
+    '❌','⚠️','⏰','📅','📞','📩','💬','📌','🚀','🙌',
+    '😴','🌙','☀️','🌧️','😊','😢','😅','🤔','👋','🎁'
+  ];
+
+  function buildEmojiPopover(){
+    emojiPopover.innerHTML = '';
+    EMOJIS.forEach(em => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'emoji-option';
+      btn.textContent = em;
+      btn.onclick = () => insertAtCursor(fText, em);
+      emojiPopover.appendChild(btn);
+    });
+  }
+
+  function insertAtCursor(input, text){
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+    const value = input.value;
+    input.value = value.slice(0, start) + text + value.slice(end);
+    const pos = start + text.length;
+    input.focus();
+    input.setSelectionRange(pos, pos);
+  }
+
+  function wrapSelection(input, marker){
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? 0;
+    const value = input.value;
+    const selected = value.slice(start, end);
+    input.value = value.slice(0, start) + marker + selected + marker + value.slice(end);
+    input.focus();
+    if(selected){
+      input.setSelectionRange(start + marker.length, end + marker.length);
+    }else{
+      const pos = start + marker.length;
+      input.setSelectionRange(pos, pos);
+    }
+  }
+
+  function buildColorRow(){
+    colorRow.innerHTML = '';
+    COLORS.forEach(c => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'color-swatch';
+      btn.style.background = c.value || 'var(--default-color)';
+      btn.title = c.name;
+      btn.setAttribute('aria-label', c.name);
+      btn.onclick = () => {
+        selectedColor = c.value;
+        [...colorRow.children].forEach(el => el.classList.remove('selected'));
+        btn.classList.add('selected');
+      };
+      colorRow.appendChild(btn);
+    });
+  }
+
+  async function loadMacros(){
+    try{
+      const result = await window.storage.get(STORAGE_KEY);
+      macros = result && result.value ? JSON.parse(result.value) : DEFAULT_MACROS;
+    }catch(err){
+      macros = DEFAULT_MACROS;
+    }
+    try{
+      const v = await window.storage.get(VIEW_KEY);
+      if(v && v.value) currentView = v.value;
+    }catch(err){ /* keep default grid */ }
+
+    applyView();
+    loadingEl.style.display = 'none';
+    render();
+    if(!(await hasStoredData())){
+      persist();
+    }
+  }
+
+  async function hasStoredData(){
+    try{
+      const result = await window.storage.get(STORAGE_KEY);
+      return !!(result && result.value);
+    }catch(err){
+      return false;
+    }
+  }
+
+  async function persist(){
+    try{
+      await window.storage.set(STORAGE_KEY, JSON.stringify(macros));
+    }catch(err){
+      console.error('Falha ao salvar macros:', err);
+    }
+  }
+
+  async function persistView(){
+    try{
+      await window.storage.set(VIEW_KEY, currentView);
+    }catch(err){ /* ignore */ }
+  }
+
+  function applyView(){
+    gridEl.classList.toggle('view-grid', currentView === 'grid');
+    gridEl.classList.toggle('view-list', currentView === 'list');
+    btnViewGrid.classList.toggle('active', currentView === 'grid');
+    btnViewList.classList.toggle('active', currentView === 'list');
+  }
+
+  function render(){
+    if(macros.length === 0){
+      gridEl.style.display = 'none';
+      emptyEl.style.display = 'block';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    gridEl.style.display = currentView === 'grid' ? 'grid' : 'flex';
+    gridEl.innerHTML = '';
+    macros.forEach(m => gridEl.appendChild(buildCard(m)));
+  }
+
+  function buildCard(m){
+    const color = m.color || null;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.draggable = true;
+    card.dataset.id = m.id;
+
+    card.addEventListener('dragstart', () => {
+      dragSrcId = m.id;
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      [...gridEl.children].forEach(c => c.classList.remove('drag-over-top','drag-over-bottom'));
+    });
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const box = card.getBoundingClientRect();
+      const before = (e.clientY - box.top) < box.height / 2;
+      card.classList.toggle('drag-over-top', before);
+      card.classList.toggle('drag-over-bottom', !before);
+    });
+    card.addEventListener('dragleave', () => {
+      card.classList.remove('drag-over-top','drag-over-bottom');
+    });
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      card.classList.remove('drag-over-top','drag-over-bottom');
+      if(!dragSrcId || dragSrcId === m.id) return;
+      const box = card.getBoundingClientRect();
+      const before = (e.clientY - box.top) < box.height / 2;
+      reorder(dragSrcId, m.id, before);
+      dragSrcId = null;
+    });
+
+    const topRow = document.createElement('div');
+    topRow.className = 'card-top-row';
+
+    const handle = document.createElement('span');
+    handle.className = 'drag-handle';
+    handle.textContent = '⠿';
+    handle.title = 'Arraste para reordenar';
+    handle.setAttribute('aria-hidden', 'true');
+
+    const dot = document.createElement('span');
+    dot.className = 'color-dot';
+    dot.style.background = color || 'var(--default-color)';
+
+    const titleSpan = document.createElement('p');
+    titleSpan.className = 'card-title';
+    titleSpan.textContent = m.title;
+    titleSpan.title = m.title;
+
+    const actions = document.createElement('div');
+    actions.className = 'icon-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'icon-btn';
+    editBtn.setAttribute('aria-label', 'Editar');
+    editBtn.textContent = 'Editar';
+    editBtn.onclick = () => openForEdit(m);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'icon-btn';
+    delBtn.setAttribute('aria-label', 'Excluir');
+    delBtn.textContent = 'Excluir';
+    delBtn.onclick = () => deleteMacro(m.id);
+
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+
+    topRow.appendChild(handle);
+    topRow.appendChild(dot);
+    topRow.appendChild(titleSpan);
+    topRow.appendChild(actions);
+
+    const preview = document.createElement('p');
+    preview.className = 'card-preview';
+    preview.textContent = m.text;
+    preview.title = m.text;
+
+    const stampBtn = document.createElement('button');
+    stampBtn.className = 'stamp-btn';
+    stampBtn.textContent = 'Copiar';
+    const c = color || getComputedStyle(document.documentElement).getPropertyValue('--default-color').trim();
+    stampBtn.style.borderColor = c;
+    stampBtn.style.color = c;
+    stampBtn.onclick = () => copyMacro(m.text, stampBtn, c);
+
+    card.appendChild(topRow);
+    card.appendChild(preview);
+    card.appendChild(stampBtn);
+    return card;
+  }
+
+  function reorder(srcId, targetId, before){
+    const srcIndex = macros.findIndex(m => m.id === srcId);
+    if(srcIndex === -1) return;
+    const [srcItem] = macros.splice(srcIndex, 1);
+    let targetIndex = macros.findIndex(m => m.id === targetId);
+    if(targetIndex === -1) targetIndex = macros.length;
+    macros.splice(before ? targetIndex : targetIndex + 1, 0, srcItem);
+    persist();
+    render();
+  }
+
+  async function copyMacro(text, btn, color){
+    try{
+      await navigator.clipboard.writeText(text);
+    }catch(err){
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    const original = btn.textContent;
+    const originalColor = btn.style.color;
+    btn.textContent = 'Copiado';
+    btn.style.background = color;
+    btn.style.color = '#fff';
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.style.background = 'transparent';
+      btn.style.color = originalColor;
+    }, 1200);
+  }
+
+  function openForNew(){
+    editingId = null;
+    fTitle.value = '';
+    fText.value = '';
+    selectedColor = null;
+    hideErrors();
+    emojiPopover.classList.remove('open');
+    buildColorRow();
+    colorRow.children[0].classList.add('selected');
+    formPanel.classList.add('open');
+    fTitle.focus();
+  }
+
+  function openForEdit(m){
+    editingId = m.id;
+    fTitle.value = m.title;
+    fText.value = m.text;
+    selectedColor = m.color || null;
+    hideErrors();
+    emojiPopover.classList.remove('open');
+    buildColorRow();
+    const idx = COLORS.findIndex(c => c.value === selectedColor);
+    colorRow.children[idx >= 0 ? idx : 0].classList.add('selected');
+    formPanel.classList.add('open');
+    fTitle.focus();
+  }
+
+  function closeForm(){
+    formPanel.classList.remove('open');
+    editingId = null;
+    hideErrors();
+  }
+
+  function hideErrors(){
+    errTitle.style.display = 'none';
+    errText.style.display = 'none';
+  }
+
+  function saveForm(){
+    const title = fTitle.value.trim();
+    const text = fText.value.trim();
+    let ok = true;
+    if(!title){ errTitle.style.display = 'block'; ok = false; } else { errTitle.style.display = 'none'; }
+    if(!text){ errText.style.display = 'block'; ok = false; } else { errText.style.display = 'none'; }
+    if(!ok) return;
+
+    if(editingId){
+      const item = macros.find(x => x.id === editingId);
+      if(item){ item.title = title; item.text = text; item.color = selectedColor; }
+    }else{
+      macros.push({ id: uid(), title, text, color: selectedColor });
+    }
+    persist();
+    render();
+    closeForm();
+  }
+
+  function deleteMacro(id){
+    macros = macros.filter(m => m.id !== id);
+    persist();
+    render();
+  }
+
+  toggleFormBtn.addEventListener('click', () => {
+    if(formPanel.classList.contains('open')){
+      closeForm();
+    }else{
+      openForNew();
+    }
+  });
+  cancelFormBtn.addEventListener('click', closeForm);
+  saveFormBtn.addEventListener('click', saveForm);
+
+  buildEmojiPopover();
+
+  fmtBold.addEventListener('click', () => wrapSelection(fText, '*'));
+  fmtItalic.addEventListener('click', () => wrapSelection(fText, '_'));
+  fmtStrike.addEventListener('click', () => wrapSelection(fText, '~'));
+
+  emojiToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    emojiPopover.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if(!emojiPopover.contains(e.target) && e.target !== emojiToggle){
+      emojiPopover.classList.remove('open');
+    }
+  });
+
+  btnViewGrid.addEventListener('click', () => {
+    currentView = 'grid';
+    applyView();
+    render();
+    persistView();
+  });
+  btnViewList.addEventListener('click', () => {
+    currentView = 'list';
+    applyView();
+    render();
+    persistView();
+  });
+
+  function showIoMsg(text, type){
+    ioMsg.textContent = text;
+    ioMsg.className = type;
+    ioMsg.style.display = 'block';
+  }
+
+  function openIoPanel(){
+    ioPanel.classList.add('open');
+    ioMsg.style.display = 'none';
+  }
+
+  btnExport.addEventListener('click', async () => {
+    ioTextarea.value = JSON.stringify(macros, null, 2);
+    openIoPanel();
+    try{
+      await navigator.clipboard.writeText(ioTextarea.value);
+      showIoMsg('JSON copiado para a área de transferência. Guarde este texto para restaurar suas macros depois.', 'success');
+    }catch(err){
+      showIoMsg('Não foi possível copiar automaticamente — selecione o texto abaixo e copie manualmente.', 'error');
+    }
+  });
+
+  btnImport.addEventListener('click', () => {
+    ioTextarea.value = '';
+    openIoPanel();
+    ioTextarea.focus();
+  });
+
+  ioCancel.addEventListener('click', () => {
+    ioPanel.classList.remove('open');
+  });
+
+  ioApply.addEventListener('click', () => {
+    let parsed;
+    try{
+      parsed = JSON.parse(ioTextarea.value);
+    }catch(err){
+      showIoMsg('JSON inválido. Confira o texto colado e tente novamente.', 'error');
+      return;
+    }
+    if(!Array.isArray(parsed)){
+      showIoMsg('O JSON precisa ser uma lista de macros.', 'error');
+      return;
+    }
+    const valid = parsed.every(m => m && typeof m.title === 'string' && typeof m.text === 'string');
+    if(!valid){
+      showIoMsg('Cada macro precisa ter pelo menos "title" e "text".', 'error');
+      return;
+    }
+    macros = parsed.map(m => ({
+      id: m.id || uid(),
+      title: m.title,
+      text: m.text,
+      color: m.color || null
+    }));
+    persist();
+    render();
+    showIoMsg('Macros importadas com sucesso!', 'success');
+  });
+
+  loadMacros();
+</script>
+</body>
+</html>
