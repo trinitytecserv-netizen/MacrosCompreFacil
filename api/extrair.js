@@ -1,5 +1,6 @@
-// Função serverless da Vercel: lê um print de tela e devolve as viagens em JSON.
-// Requer a variável de ambiente ANTHROPIC_API_KEY (Vercel > Settings > Environment Variables).
+// Função serverless da Vercel: lê um print de tela com o Google Gemini (plano gratuito)
+// e devolve as viagens em JSON.
+// Requer a variável de ambiente GEMINI_API_KEY (Vercel > Settings > Environment Variables).
 
 const PROMPT = `Esta imagem é um print de uma tabela de viagens de transporte.
 Para cada linha da tabela (cada linha é uma viagem distinta), extraia os valores das colunas "Motorista", "Veículo" e "Descrição".
@@ -12,6 +13,9 @@ Regras:
 
 Responda SOMENTE com JSON válido, sem texto antes ou depois, neste formato:
 {"viagens":[{"motorista":"","veiculo":"","descricao":""}]}`;
+
+// Modelos tentados em ordem. Você pode forçar um modelo com a variável GEMINI_MODEL.
+const MODELOS = [process.env.GEMINI_MODEL, 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'].filter(Boolean);
 
 function parseViagens(text) {
   const clean = String(text || '').replace(/```json|```/g, '').trim();
@@ -27,15 +31,36 @@ function parseViagens(text) {
   }));
 }
 
+async function chamarGemini(modelo, apiKey, image, mediaType) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            { inline_data: { mime_type: mediaType || 'image/jpeg', data: image } },
+            { text: PROMPT },
+          ],
+        },
+      ],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0 },
+    }),
+  });
+  const data = await resp.json().catch(() => ({}));
+  return { resp, data };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Método não permitido.' });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada na Vercel.' });
+    return res.status(500).json({ error: 'GEMINI_API_KEY não configurada na Vercel.' });
   }
 
   const { image, mediaType } = req.body || {};
@@ -43,41 +68,26 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Imagem não enviada.' });
   }
 
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: process.env.CLAUDE_MODEL || 'claude-sonnet-5-5',
-        max_tokens: 4000,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: mediaType || 'image/jpeg', data: image },
-              },
-              { type: 'text', text: PROMPT },
-            ],
-          },
-        ],
-      }),
-    });
+  let ultimoErro = 'Erro desconhecido.';
+  for (const modelo of MODELOS) {
+    try {
+      const { resp, data } = await chamarGemini(modelo, apiKey, image, mediaType);
 
-    const data = await resp.json();
-    if (!resp.ok) {
-      const msg = (data && data.error && data.error.message) || 'Erro na API.';
-      return res.status(502).json({ error: 'Falha ao ler o print: ' + msg });
+      if (resp.ok) {
+        const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+        const text = parts.map((p) => p.text || '').join('\n');
+        return res.status(200).json({ viagens: parseViagens(text) });
+      }
+
+      ultimoErro = (data && data.error && data.error.message) || 'Erro na API do Gemini.';
+      // Modelo inexistente ou limite atingido: tenta o próximo da lista.
+      if (resp.status === 404 || resp.status === 429) continue;
+      // Chave inválida ou requisição ruim: não adianta tentar outro modelo.
+      return res.status(502).json({ error: 'Falha ao ler o print: ' + ultimoErro });
+    } catch (err) {
+      ultimoErro = 'Não foi possível interpretar a resposta do Gemini.';
     }
-
-    const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-    return res.status(200).json({ viagens: parseViagens(text) });
-  } catch (err) {
-    return res.status(500).json({ error: 'Não foi possível interpretar o print. Tente novamente.' });
   }
+
+  return res.status(502).json({ error: 'Falha ao ler o print: ' + ultimoErro });
 };
