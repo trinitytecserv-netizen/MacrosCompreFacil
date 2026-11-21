@@ -272,7 +272,6 @@
     border:1px solid var(--border);
     border-color:color-mix(in srgb, var(--cat-color) 45%, var(--border));
     border-radius:12px;
-    overflow:hidden;
     transition:opacity .15s ease;
   }
   .cat.dragging{opacity:.35;}
@@ -539,6 +538,75 @@
     padding:12px 14px;
     margin-bottom:14px;
     resize:vertical;
+  }
+
+  /* ---------- Efeito 3D (tilt + glass) ao passar o mouse ---------- */
+  .cat-header{border-radius:11px;position:relative;}
+  .cat.open .cat-header{border-radius:11px 11px 0 0;}
+  .rec{position:relative;}
+  .cat-header > *, .rec > *{position:relative;z-index:1;}
+
+  @media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
+    .cat-header, .rec{
+      transform-style:flat;
+      transition:
+        transform .55s cubic-bezier(0.23, 1, 0.32, 1),
+        box-shadow .55s cubic-bezier(0.23, 1, 0.32, 1),
+        background-color .3s ease,
+        border-color .3s ease,
+        opacity .15s ease;
+    }
+    .cat-header::before, .rec::before{
+      content:'';
+      position:absolute;
+      inset:0;
+      border-radius:inherit;
+      pointer-events:none;
+      opacity:0;
+      z-index:0;
+      transition:opacity .4s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    /* Categorias: vidro fosco mais marcante */
+    .cat-header{
+      background:color-mix(in srgb, var(--cat-color) 18%, rgba(30,37,46,.7));
+      -webkit-backdrop-filter:blur(14px) saturate(150%);
+      backdrop-filter:blur(14px) saturate(150%);
+    }
+    .cat-header::before{
+      background:radial-gradient(460px circle at var(--mx, 50%) var(--my, 50%),
+        rgba(255,255,255,.24), rgba(255,255,255,.07) 42%, transparent 72%);
+    }
+    .cat-header:hover{
+      z-index:6;
+      transform:perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1.012);
+      background:color-mix(in srgb, var(--cat-color) 30%, rgba(30,37,46,.6));
+      box-shadow:
+        0 26px 48px -16px rgba(0,0,0,.75),
+        0 12px 22px -12px color-mix(in srgb, var(--cat-color) 55%, transparent),
+        inset 0 0 0 1px color-mix(in srgb, var(--cat-color) 55%, rgba(255,255,255,.6)),
+        inset 0 1px 0 rgba(255,255,255,.28);
+      will-change:transform;
+    }
+
+    /* Registros: reflexo mais limpo e discreto */
+    .rec::before{
+      background:radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%),
+        rgba(255,255,255,.09), transparent 66%);
+    }
+    .rec:hover{
+      z-index:4;
+      transform:perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1.012);
+      border-color:rgba(255,255,255,.2);
+      box-shadow:
+        0 16px 32px -14px rgba(0,0,0,.68),
+        0 5px 12px -8px rgba(0,0,0,.5),
+        inset 0 0 0 1px rgba(255,255,255,.1);
+      will-change:transform;
+    }
+
+    .cat-header:hover::before, .rec:hover::before{opacity:1;}
+    .cat.dragging .cat-header, .rec.dragging{transform:none;box-shadow:none;}
   }
 </style>
 </head>
@@ -1007,6 +1075,45 @@
     return s;
   }
 
+  // ---------- Efeito 3D: inclinação seguindo o cursor ----------
+  const TILT_ENABLED = typeof window.matchMedia === 'function' &&
+    window.matchMedia('(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)').matches;
+
+  function attachTilt(el, maxX, maxY){
+    if(!TILT_ENABLED) return;
+    let raf = 0;
+    let lastEvent = null;
+
+    const reset = () => {
+      lastEvent = null;
+      if(raf){ cancelAnimationFrame(raf); raf = 0; }
+      el.style.transform = '';
+    };
+
+    el.addEventListener('mousemove', (e) => {
+      lastEvent = e;
+      if(raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if(!lastEvent) return;
+        const w = el.offsetWidth;
+        const h = el.offsetHeight;
+        if(!w || !h) return;
+        const box = el.getBoundingClientRect();
+        const dx = lastEvent.clientX - (box.left + box.width / 2);
+        const dy = lastEvent.clientY - (box.top + box.height / 2);
+        const nx = Math.max(-1, Math.min(1, dx / (w / 2)));
+        const ny = Math.max(-1, Math.min(1, dy / (h / 2)));
+        el.style.setProperty('--mx', (dx + w / 2).toFixed(1) + 'px');
+        el.style.setProperty('--my', (dy + h / 2).toFixed(1) + 'px');
+        el.style.transform = 'perspective(1000px) rotateX(' + (-ny * maxX).toFixed(2) + 'deg) rotateY(' +
+          (nx * maxY).toFixed(2) + 'deg) scale(1.012)';
+      });
+    });
+    el.addEventListener('mouseleave', reset);
+    el.addEventListener('dragstart', reset);
+  }
+
   function buildCategory(g){
     const color = g.color || DEFAULT_COLOR;
     const isOpen = openCats.has(g.key);
@@ -1028,6 +1135,7 @@
     const name = makeSpan('cat-name', g.name);
     header.append(handle, makeSpan('cat-chevron', '▶'), makeSpan('color-dot'), name, makeSpan('cat-count', String(g.items.length)));
 
+    attachTilt(header, 2, 3);
     header.addEventListener('click', () => toggleCategory(cat, g.key));
     header.addEventListener('keydown', (e) => {
       if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleCategory(cat, g.key); }
@@ -1095,6 +1203,7 @@
         ? (e.clientX - box.left) < box.width / 2
         : (e.clientY - box.top) < box.height / 2;
     };
+    attachTilt(rec, 2, 2.5);
     const canDrop = () => dragState && dragState.type === 'rec' && dragState.key === key && dragState.id !== m.id;
 
     rec.addEventListener('dragstart', (e) => {
